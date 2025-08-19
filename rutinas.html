@@ -307,17 +307,26 @@ function renderEstado(){
     $listo.style.display = 'inline-block';
     $hecho.style.display = 'none';
   } else if (state.waitingForReady){
-    const b = currentBlock();
-    html += `<div><span class="badge block">Bloque</span> <span class="big">${b.name}</span></div>`;
-    html += `<div class="desc">${b.description||''}</div>`;
-    html += `<div class="muted">Pulsa <strong>Estoy listo</strong> para empezar el primer paso.</div>`;
+    const nxt = nextPointer();
+    if (state.stepIndex < 0){
+      const b = currentBlock();
+      html += `<div><span class="badge block">Bloque</span> <span class="big">${b.name}</span></div>`;
+      html += `<div class="desc">${b.description||''}</div>`;
+      html += `<div class="muted">Pulsa <strong>Estoy listo</strong> para empezar el primer paso.</div>`;
+    } else if (nxt.type === 'step'){
+      const b = r.blocks[nxt.blockIndex];
+      const s = b.steps[nxt.stepIndex];
+      html += `<div><span class="badge step">Próximo paso</span> <span class="big">${s.name}</span></div>`;
+      html += `<div class="desc">${s.description||''}</div>`;
+      html += `<div class="muted">Pulsa <strong>Estoy listo</strong> para continuar.</div>`;
+    }
     $listo.style.display = 'inline-block';
     $hecho.style.display = 'none';
   } else if (state.resting){
     const step = currentStep();
     html += `<div><span class="badge step">Descanso</span> tras <strong>${step.name}</strong></div>`;
     html += `<div class="timer" id="timer">${secondsFmt(state.restRemaining)}</div>`;
-    html += `<div class="hint">Se iniciará el siguiente elemento automáticamente.</div>`;
+    html += `<div class="hint">Al terminar el descanso pulsa <strong>Estoy listo</strong> para continuar.</div>`;
     $listo.style.display = 'none';
     $hecho.style.display = 'none';
   } else {
@@ -364,8 +373,9 @@ function startRest(seconds){
     if (state.restRemaining <= 0){
       stopTimer();
       state.resting = false;
+      state.waitingForReady = true;
       playBeep();
-      goNext();
+      renderEstado();
     }
   }, 1000);
 }
