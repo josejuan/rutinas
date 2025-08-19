@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rutinas · SPA (Vanilla JS)</title>
+  <style>
+    :root{
+      --bg:#0f172a;/* slate-900 */
+      --panel:#111827;/* gray-900 */
+      --muted:#94a3b8;/* slate-400 */
+      --text:#e5e7eb;/* gray-200 */
+      --accent:#22c55e;/* green-500 */
+      --accent-2:#38bdf8;/* sky-400 */
+      --warn:#f59e0b;/* amber-500 */
+      --danger:#ef4444;/* red-500 */
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:linear-gradient(180deg,#0b1220,#0f172a);color:var(--text)}
+    .container{max-width:960px;margin:24px auto;padding:16px}
+    header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title{font-size:clamp(20px,3vw,28px);font-weight:700;letter-spacing:.2px}
+    .card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    select,button{border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:var(--text);padding:10px 12px;font-size:15px}
+    button{cursor:pointer;transition:transform .05s ease,opacity .2s ease}
+    button:active{transform:scale(.98)}
+    button.primary{background:linear-gradient(180deg,#1e293b,#0b1220);border-color:rgba(56,189,248,.35)}
+    button.accent{background:linear-gradient(180deg,#064e3b,#052e25);border-color:rgba(34,197,94,.5)}
+    button.warn{background:linear-gradient(180deg,#3a2b05,#231a03);border-color:rgba(245,158,11,.5)}
+    .muted{color:var(--muted)}
+    .section-title{font-weight:700;margin:6px 0 8px 0}
+    .big{font-size:22px;font-weight:800}
+    .timer{font-variant-numeric:tabular-nums;font-size:26px;font-weight:800}
+    .hint{font-size:13px;color:var(--muted)}
+    .desc{opacity:.9}
+    .next{border-left:3px solid rgba(56,189,248,.5);padding-left:10px}
+    .footer{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+    .kbd{border:1px solid rgba(255,255,255,.15);border-bottom-width:2px;padding:2px 6px;border-radius:6px;background:#0b1220}
+    .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;margin-right:6px}
+    .badge.block{background:rgba(56,189,248,.15);color:var(--accent-2)}
+    .badge.step{background:rgba(34,197,94,.15);color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">Entrenamiento 45' · Rutinas guiadas</div>
+      <div class="row">
+        <select id="rutinaSelect" aria-label="Selecciona rutina"></select>
+        <button id="randomBtn" class="primary" title="Elegir rutina aleatoria">Aleatorio 🎲</button>
+        <button id="resetBtn" class="warn" title="Reiniciar">Reiniciar ↺</button>
+      </div>
+    </header>
+
+    <!-- Estado arriba del todo -->
+    <section class="card" id="panelEstado">
+      <div class="section-title">Estado</div>
+      <div id="estado"></div>
+      <div class="footer">
+        <button id="listoBtn" class="accent" style="display:none">Estoy listo ✅</button>
+        <button id="hechoBtn" class="primary" style="display:none">¡Hecho! ✔</button>
+      </div>
+    </section>
+
+    <!-- Siguiente justo después -->
+    <section class="card" style="margin-top:12px">
+      <div class="section-title">Siguiente</div>
+      <div id="siguiente"></div>
+    </section>
+
+    <!-- Resumen al final -->
+    <section class="card" style="margin-top:12px">
+      <div class="section-title">Resumen</div>
+      <div id="resumenDetalle"></div>
+    </section>
+
+    <p class="hint">Atajos: <span class="kbd">L</span> = Estoy listo, <span class="kbd">H</span> = ¡Hecho!, <span class="kbd">R</span> = Reiniciar</p>
+  </div>
+
+<script>
+// --- Datos de ejemplo (añadido stepTime además de waitSeconds) ---
+const rutinas = [
+  {
+    name: "Rutina A – Fuerza completa",
+    description: "45' base: piernas, pecho, espalda, hombro, bíceps y core.",
+    blocks: [
+      {
+        name: "Calentamiento",
+        description: "Movilidad dinámica + activación circulatoria.",
+        steps: [
+          { name: "Caminar en sitio 2'", description: "Paso ligero con braceo para subir temperatura.", stepTime: 120, waitSeconds: 15 },
+          { name: "Círculos de brazos", description: "Círculos controlados de hombros y brazos (1').", stepTime: 60, waitSeconds: 15 },
+          { name: "Rotaciones cadera y tronco", description: "Giros suaves de tronco y cadera (1').", stepTime: 60, waitSeconds: 15 },
+          { name: "Sentadillas suaves", description: "Sentadilla sin peso en rango cómodo (2').", stepTime: 120, waitSeconds: 15 },
+          { name: "Tobillos + isquios dinámicos", description: "Movilidad de tobillos y balanceos de pierna (2').", stepTime: 120, waitSeconds: 15 }
+        ]
+      },
+      {
+        name: "Piernas",
+        description: "Sentadilla y peso muerto rumano.",
+        steps: [
+          { name: "Sentadilla mancuernas 1/3", description: "10–12 rep. Pecho arriba, rodillas alineadas, core firme.", stepTime: 0, waitSeconds: 90 },
+          { name: "Sentadilla mancuernas 2/3", description: "10–12 rep. Pecho arriba, rodillas alineadas, core firme.", stepTime: 0, waitSeconds: 90 },
+          { name: "Sentadilla mancuernas 3/3", description: "10–12 rep. Pecho arriba, rodillas alineadas, core firme.", stepTime: 0, waitSeconds: 90 },
+          { name: "Peso muerto rumano 1/3", description: "8–10 rep. Bisagra de cadera; espalda neutra; carga cerca del cuerpo.", stepTime: 0, waitSeconds: 90 },
+          { name: "Peso muerto rumano 2/3", description: "8–10 rep. Bisagra de cadera; espalda neutra; carga cerca del cuerpo.", stepTime: 0, waitSeconds: 90 },
+          { name: "Peso muerto rumano 3/3", description: "8–10 rep. Bisagra de cadera; espalda neutra; carga cerca del cuerpo.", stepTime: 0, waitSeconds: 90 }
+        ]
+      },
+      {
+        name: "Tren superior",
+        description: "Pecho, espalda, hombros y bíceps.",
+        steps: [
+          { name: "Press pecho suelo 1/3", description: "8–10 rep. Codos ~45°, escápulas retraídas, muñecas neutras.", stepTime: 0, waitSeconds: 90 },
+          { name: "Press pecho suelo 2/3", description: "8–10 rep. Codos ~45°, escápulas retraídas, muñecas neutras.", stepTime: 0, waitSeconds: 90 },
+          { name: "Press pecho suelo 3/3", description: "8–10 rep. Codos ~45°, escápulas retraídas, muñecas neutras.", stepTime: 0, waitSeconds: 90 },
+          { name: "Remo inclinado 1/3", description: "10–12 rep. Torso fijo; tira con codos; pausa breve arriba.", stepTime: 0, waitSeconds: 90 },
+          { name: "Remo inclinado 2/3", description: "10–12 rep. Torso fijo; tira con codos; pausa breve arriba.", stepTime: 0, waitSeconds: 90 },
+          { name: "Remo inclinado 3/3", description: "10–12 rep. Torso fijo; tira con codos; pausa breve arriba.", stepTime: 0, waitSeconds: 90 },
+          { name: "Press hombros 1/2", description: "8–10 rep. De pie; glúteos/abdomen activos; no arquear lumbar.", stepTime: 0, waitSeconds: 75 },
+          { name: "Press hombros 2/2", description: "8–10 rep. De pie; glúteos/abdomen activos; no arquear lumbar.", stepTime: 0, waitSeconds: 75 },
+          { name: "Curl bíceps 1/2", description: "10–12 rep. Codos pegados; sin balanceo; controla la bajada.", stepTime: 0, waitSeconds: 60 },
+          { name: "Curl bíceps 2/2", description: "10–12 rep. Codos pegados; sin balanceo; controla la bajada.", stepTime: 0, waitSeconds: 60 }
+        ]
+      },
+      {
+        name: "Core + equilibrio",
+        description: "Plancha y zancadas estáticas (sin peso).",
+        steps: [
+          { name: "Plancha frontal 1/2", description: "40\". Abdomen y glúteo firmes; hombros lejos de orejas.", stepTime: 40, waitSeconds: 45 },
+          { name: "Plancha frontal 2/2", description: "40\". Abdomen y glúteo firmes; hombros lejos de orejas.", stepTime: 40, waitSeconds: 45 },
+          { name: "Zancadas estáticas 1/2", description: "8 por pierna. Tronco erguido; paso medio; estabilidad.", stepTime: 0, waitSeconds: 60 },
+          { name: "Zancadas estáticas 2/2", description: "8 por pierna. Tronco erguido; paso medio; estabilidad.", stepTime: 0, waitSeconds: 60 }
+        ]
+      },
+      {
+        name: "Vuelta a la calma",
+        description: "Movilidad ligera y respiración.",
+        steps: [
+          { name: "Cadera y glúteo", description: "1' estiramiento suave (flexor cadera/piriforme).", stepTime: 60, waitSeconds: 10 },
+          { name: "Hombros y dorsales", description: "1' estiramiento cómodo, sin dolor.", stepTime: 60, waitSeconds: 10 },
+          { name: "Respiración nasal", description: "1' diafragmática con exhalación larga.", stepTime: 60, waitSeconds: 0 }
+        ]
+      }
+    ]
+  },
+  {
+    name: "Rutina B – Variación",
+    description: "Alterna ángulos y énfasis manteniendo 45'.",
+    blocks: [
+      {
+        name: "Calentamiento",
+        description: "Dinámico, similar al de A.",
+        steps: [
+          { name: "Caminar ligero", description: "2' a ritmo cómodo con braceo.", stepTime: 120, waitSeconds: 15 },
+          { name: "Movilidad hombros", description: "1' círculos y retracción escapular.", stepTime: 60, waitSeconds: 15 },
+          { name: "Bisagra de cadera", description: "1' patrón RDL sin peso; columna neutra.", stepTime: 60, waitSeconds: 15 }
+        ]
+      },
+      {
+        name: "Inferior (bisagra)",
+        description: "RDL + puente de glúteo.",
+        steps: [
+          { name: "RDL 1/3", description: "8–10 rep. Bisagra de cadera; espalda neutra; peso en talones.", stepTime: 0, waitSeconds: 90 },
+          { name: "RDL 2/3", description: "8–10 rep. Bisagra de cadera; espalda neutra; peso en talones.", stepTime: 0, waitSeconds: 90 },
+          { name: "RDL 3/3", description: "8–10 rep. Bisagra de cadera; espalda neutra; peso en talones.", stepTime: 0, waitSeconds: 90 },
+          { name: "Puente glúteo 1/2", description: "12–15 rep. Empuje de talones; pausa breve arriba.", stepTime: 0, waitSeconds: 60 },
+          { name: "Puente glúteo 2/2", description: "12–15 rep. Empuje de talones; pausa breve arriba.", stepTime: 0, waitSeconds: 60 }
+        ]
+      },
+      {
+        name: "Empuje/Tirón",
+        description: "Flexiones inclinadas + remo a una mano.",
+        steps: [
+          { name: "Flexiones inclinadas 1/3", description: "8–12 rep. Cuerpo en tabla; manos bajo hombros.", stepTime: 0, waitSeconds: 75 },
+          { name: "Flexiones inclinadas 2/3", description: "8–12 rep. Cuerpo en tabla; manos bajo hombros.", stepTime: 0, waitSeconds: 75 },
+          { name: "Flexiones inclinadas 3/3", description: "8–12 rep. Cuerpo en tabla; manos bajo hombros.", stepTime: 0, waitSeconds: 75 },
+          { name: "Remo a una mano 1/3", description: "10–12 rep por lado. Torso quieto; apoyo estable.", stepTime: 0, waitSeconds: 90 },
+          { name: "Remo a una mano 2/3", description: "10–12 rep por lado. Torso quieto; apoyo estable.", stepTime: 0, waitSeconds: 90 },
+          { name: "Remo a una mano 3/3", description: "10–12 rep por lado. Torso quieto; apoyo estable.", stepTime: 0, waitSeconds: 90 }
+        ]
+      },
+      {
+        name: "Core",
+        description: "Plancha lateral y hollow hold.",
+        steps: [
+          { name: "Plancha lateral 1/2", description: "40\" por lado. Cadera alta; cuello neutro.", stepTime: 80, waitSeconds: 45 },
+          { name: "Plancha lateral 2/2", description: "40\" por lado. Cadera alta; cuello neutro.", stepTime: 80, waitSeconds: 45 },
+          { name: "Hollow hold 1/2", description: "40\". Zona lumbar pegada al suelo.", stepTime: 40, waitSeconds: 45 },
+          { name: "Hollow hold 2/2", description: "40\". Zona lumbar pegada al suelo.", stepTime: 40, waitSeconds: 45 }
+        ]
+      }
+    ]
+  }
+];
+
+
+// --- Estado de la aplicación ---
+const state = {
+  rutinaIndex: 0,
+  blockIndex: -1,
+  stepIndex: -1,
+  waitingForReady: true,
+  resting: false,
+  restRemaining: 0,
+  stepRemaining: 0,
+  inStepTimer: false,
+  timerId: null,
+};
+
+// --- Utilidades ---
+const $ = sel => document.querySelector(sel);
+const secondsFmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+// Sistema de audio simplificado
+let audioContext = null;
+let audioInitialized = false;
+
+function initAudio() {
+  if (audioInitialized) return;
+
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioInitialized = true;
+    console.log("AudioContext inicializado correctamente");
+  } catch (e) {
+    console.error("Error al inicializar AudioContext:", e);
+  }
+}
+
+function playBeep() {
+  if (!audioInitialized) {
+    initAudio();
+  }
+
+  if (!audioContext) return;
+
+  try {
+    // Crear dos beeps consecutivos
+    createBeep(880, 0.15, 0);
+    createBeep(1320, 0.15, 0.2);
+  } catch (e) {
+    console.error("Error al reproducir beep:", e);
+  }
+}
+
+function createBeep(frequency, duration, delay) {
+  if (!audioContext) return;
+
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+
+  oscillator.type = 'sine';
+  oscillator.frequency.value = frequency;
+
+  gainNode.gain.setValueAtTime(0, audioContext.currentTime + delay);
+  gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + delay + 0.01);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + delay + duration);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  oscillator.start(audioContext.currentTime + delay);
+  oscillator.stop(audioContext.currentTime + delay + duration);
+}
+
+function currentRutina(){ return rutinas[state.rutinaIndex]; }
+function currentBlock(){ return currentRutina().blocks[state.blockIndex]; }
+function currentStep(){ return currentBlock().steps[state.stepIndex]; }
+
+function nextPointer(){
+  const r = currentRutina();
+  let b = state.blockIndex, s = state.stepIndex + 1;
+  if (b < 0) return {type:'block', blockIndex:0, stepIndex:0};
+  if (s < r.blocks[b].steps.length) return {type:'step', blockIndex:b, stepIndex:s};
+  b = b + 1;
+  if (b < r.blocks.length) return {type:'block', blockIndex:b, stepIndex:0};
+  return {type:'end'};
+}
+
+function renderResumen(){
+  const r = currentRutina();
+  let html = `<div><span class="badge">Rutina</span> <span class="big">${r.name}</span></div>`;
+  html += `<div class="muted" style="margin:6px 0 10px 0">${r.description}</div>`;
+  html += r.blocks.map((b,i)=>`
+    <div style="margin:8px 0">
+      <div><span class="badge block">Bloque ${i+1}</span> <strong>${b.name}</strong></div>
+      <div class="hint">${b.description||''}</div>
+      <ol style="margin:6px 0 0 18px">
+        ${b.steps.map(s=>`<li class="hint">${s.name}</li>`).join('')}
+      </ol>
+    </div>`).join('');
+  $('#resumenDetalle').innerHTML = html;
+}
+
+function renderEstado(){
+  const r = currentRutina();
+  const inited = state.blockIndex >= 0;
+  const $estado = $('#estado');
+  const $listo = $('#listoBtn');
+  const $hecho = $('#hechoBtn');
+
+  let html = '';
+  if (!inited){
+    html += `<div class="muted">Selecciona rutina y pulsa <strong>Estoy listo</strong> para empezar el primer bloque.</div>`;
+    $listo.style.display = 'inline-block';
+    $hecho.style.display = 'none';
+  } else if (state.waitingForReady){
+    const b = currentBlock();
+    html += `<div><span class="badge block">Bloque</span> <span class="big">${b.name}</span></div>`;
+    html += `<div class="desc">${b.description||''}</div>`;
+    html += `<div class="muted">Pulsa <strong>Estoy listo</strong> para empezar el primer paso.</div>`;
+    $listo.style.display = 'inline-block';
+    $hecho.style.display = 'none';
+  } else if (state.resting){
+    const step = currentStep();
+    html += `<div><span class="badge step">Descanso</span> tras <strong>${step.name}</strong></div>`;
+    html += `<div class="timer" id="timer">${secondsFmt(state.restRemaining)}</div>`;
+    html += `<div class="hint">Se iniciará el siguiente elemento automáticamente.</div>`;
+    $listo.style.display = 'none';
+    $hecho.style.display = 'none';
+  } else {
+    const step = currentStep();
+    const timed = Number(step.stepTime||0) > 0;
+    html += `<div><span class="badge step">Ejecuta${timed?' (tiempo)':''}</span> <span class="big">${step.name}</span></div>`;
+    if (timed){
+      html += `<div class="timer" id="stepTimer">${secondsFmt(state.stepRemaining||Number(step.stepTime))}</div>`;
+      html += `<div class="hint">Al terminar el tiempo sonará una campana. Luego pulsa <strong>¡Hecho!</strong></div>`;
+    }
+    html += `<div class="desc">${step.description||''}</div>`;
+    $listo.style.display = 'none';
+    $hecho.style.display = 'inline-block';
+  }
+  $estado.innerHTML = html;
+
+  // Panel "Siguiente"
+  const nxt = nextPointer();
+  let nxtHtml = '';
+  if (nxt.type === 'step'){
+    const b = r.blocks[nxt.blockIndex];
+    const s = b.steps[nxt.stepIndex];
+    nxtHtml = `<div class="next"><div><span class="badge step">Siguiente paso</span> <strong>${s.name}</strong></div><div class="hint">${s.description||''}</div></div>`;
+  } else if (nxt.type === 'block'){
+    const b = r.blocks[nxt.blockIndex];
+    nxtHtml = `<div class="next"><div><span class="badge block">Siguiente bloque</span> <strong>${b.name}</strong></div><div class="hint">${b.description||''}</div></div>`;
+  } else {
+    nxtHtml = `<div class="next"><div><span class="badge">Fin</span> <strong>Rutina completada</strong></div><div class="hint">Puedes reiniciar o elegir otra.</div></div>`;
+  }
+  $('#siguiente').innerHTML = nxtHtml;
+}
+
+function stopTimer(){ if(state.timerId){ clearInterval(state.timerId); state.timerId=null; } }
+
+function startRest(seconds){
+  stopTimer();
+  state.resting = true;
+  state.restRemaining = seconds;
+  renderEstado();
+  state.timerId = setInterval(()=>{
+    state.restRemaining -= 1;
+    const t = $('#timer');
+    if (t) t.textContent = secondsFmt(Math.max(0,state.restRemaining));
+    if (state.restRemaining <= 0){
+      stopTimer();
+      state.resting = false;
+      playBeep();
+      goNext();
+    }
+  }, 1000);
+}
+
+function startStepTimer(seconds){
+  stopTimer();
+  state.inStepTimer = true;
+  state.stepRemaining = seconds;
+  renderEstado();
+  state.timerId = setInterval(()=>{
+    state.stepRemaining -= 1;
+    const t = $('#stepTimer');
+    if (t) t.textContent = secondsFmt(Math.max(0,state.stepRemaining));
+    if (state.stepRemaining <= 0){
+      stopTimer();
+      state.inStepTimer = false;
+      playBeep();
+      // NO auto-avanzar: el usuario pulsa ¡Hecho!
+      renderEstado();
+    }
+  }, 1000);
+}
+
+function goNext(){
+  const r = currentRutina();
+  const nxt = nextPointer();
+  if (nxt.type === 'end'){
+    state.waitingForReady = true;
+    state.blockIndex = r.blocks.length - 1;
+    state.stepIndex = r.blocks[state.blockIndex].steps.length - 1;
+    renderEstado();
+    return;
+  }
+  if (nxt.type === 'block'){
+    state.blockIndex = nxt.blockIndex;
+    state.stepIndex = -1;
+    state.waitingForReady = true;
+    renderEstado();
+    return;
+  }
+  if (nxt.type === 'step'){
+    state.blockIndex = nxt.blockIndex;
+    state.stepIndex = nxt.stepIndex;
+    state.waitingForReady = false;
+    state.resting = false;
+    state.inStepTimer = false;
+    const step = currentStep();
+    if (step.stepTime && step.stepTime>0){
+      startStepTimer(step.stepTime);
+    } else {
+      renderEstado();
+    }
+  }
+}
+
+function onListo(){
+  initAudio(); // Inicializar audio en la primera interacción del usuario
+  if (state.waitingForReady){
+    if (state.blockIndex < 0){ state.blockIndex = 0; state.stepIndex = -1; }
+    const nxt = nextPointer();
+    if (nxt.type === 'step'){
+      state.blockIndex = nxt.blockIndex;
+      state.stepIndex = nxt.stepIndex;
+      state.waitingForReady = false;
+      const step = currentStep();
+      if (step.stepTime && step.stepTime>0){
+        startStepTimer(step.stepTime);
+      } else {
+        renderEstado();
+      }
+    }
+  }
+}
+
+function onHecho(){
+  const step = currentStep();
+  const nxt = nextPointer();
+
+  if (nxt.type === 'block'){
+    // When the next item is a new block, go directly to it
+    // instead of just setting waitingForReady
+    goNext();
+  } else if (nxt.type === 'step'){
+    const rest = Number(step.waitSeconds||0);
+    if (rest > 0){
+      startRest(rest);
+    } else {
+      goNext();
+    }
+  } else {
+    renderEstado();
+  }
+}
+
+function populateSelect(){
+  const sel = $('#rutinaSelect');
+  sel.innerHTML = '';
+  rutinas.forEach((r,idx)=>{
+    const opt = document.createElement('option');
+    opt.value = idx; opt.textContent = r.name; sel.appendChild(opt);
+  });
+  sel.value = String(state.rutinaIndex);
+}
+
+function onSelectChange(){
+  state.rutinaIndex = Number($('#rutinaSelect').value);
+  resetFlow(false);
+}
+
+function resetFlow(preserveSelection=true){
+  stopTimer();
+  state.blockIndex = -1;
+  state.stepIndex = -1;
+  state.waitingForReady = true;
+  state.resting = false;
+  state.restRemaining = 0;
+  state.stepRemaining = 0;
+  state.inStepTimer = false;
+  if (!preserveSelection) populateSelect();
+  renderResumen();
+  renderEstado();
+}
+
+// --- Inicialización ---
+(function init(){
+  populateSelect();
+  renderResumen();
+  renderEstado();
+
+  $('#rutinaSelect').addEventListener('change', onSelectChange);
+  $('#randomBtn').addEventListener('click', ()=>{
+    const idx = Math.floor(Math.random()*rutinas.length);
+    state.rutinaIndex = idx;
+    $('#rutinaSelect').value = String(idx);
+    resetFlow(false);
+  });
+  $('#resetBtn').addEventListener('click', ()=> resetFlow(false));
+  $('#listoBtn').addEventListener('click', onListo);
+  $('#hechoBtn').addEventListener('click', onHecho);
+
+  // Atajos de teclado
+  window.addEventListener('keydown', (e)=>{
+    if (e.key.toLowerCase()==='l') { onListo(); }
+    if (e.key.toLowerCase()==='h') { onHecho(); }
+    if (e.key.toLowerCase()==='r') { resetFlow(false); }
+  });
+})();
+</script>
+</body>
+</html>
