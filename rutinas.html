@@ -307,35 +307,35 @@ function renderEstado(){
     $listo.style.display = 'inline-block';
     $hecho.style.display = 'none';
   } else if (state.waitingForReady){
-    const nxt = nextPointer();
-    if (state.stepIndex < 0){
-      const b = currentBlock();
-      html += `<div><span class="badge block">Bloque</span> <span class="big">${b.name}</span></div>`;
-      html += `<div class="desc">${b.description||''}</div>`;
-      html += `<div class="muted">Pulsa <strong>Estoy listo</strong> para empezar el primer paso.</div>`;
-    } else if (nxt.type === 'step'){
-      const b = r.blocks[nxt.blockIndex];
-      const s = b.steps[nxt.stepIndex];
-      html += `<div><span class="badge step">Próximo paso</span> <span class="big">${s.name}</span></div>`;
-      html += `<div class="desc">${s.description||''}</div>`;
-      html += `<div class="muted">Pulsa <strong>Estoy listo</strong> para continuar.</div>`;
-    }
+    const b = currentBlock();
+    const step = currentStep();
+    html += `<div><span class="badge block">Bloque</span> <span class="big">${b.name}</span></div>`;
+    html += `<div class="desc">${b.description||''}</div>`;
+    html += `<div class="muted" style="margin-top:12px">Pulsa <strong>Estoy listo</strong> para empezar:</div>`;
+    html += `<div style="margin-top:8px"><span class="badge step">Paso ${state.stepIndex+1}</span> <strong>${step.name}</strong></div>`;
     $listo.style.display = 'inline-block';
     $hecho.style.display = 'none';
   } else if (state.resting){
     const step = currentStep();
     html += `<div><span class="badge step">Descanso</span> tras <strong>${step.name}</strong></div>`;
     html += `<div class="timer" id="timer">${secondsFmt(state.restRemaining)}</div>`;
-    html += `<div class="hint">Al terminar el descanso pulsa <strong>Estoy listo</strong> para continuar.</div>`;
+    html += `<div class="hint">Se iniciará el siguiente elemento automáticamente.</div>`;
+    $listo.style.display = 'none';
+    $hecho.style.display = 'none';
+  } else if (state.inStepTimer) {
+    const step = currentStep();
+    html += `<div><span class="badge step">Ejecutando (tiempo)</span> <span class="big">${step.name}</span></div>`;
+    html += `<div class="timer" id="stepTimer">${secondsFmt(state.stepRemaining)}</div>`;
+    html += `<div class="hint">Al terminar el tiempo sonará una campana. Luego pulsa <strong>¡Hecho!</strong></div>`;
+    html += `<div class="desc">${step.description||''}</div>`;
     $listo.style.display = 'none';
     $hecho.style.display = 'none';
   } else {
     const step = currentStep();
     const timed = Number(step.stepTime||0) > 0;
-    html += `<div><span class="badge step">Ejecuta${timed?' (tiempo)':''}</span> <span class="big">${step.name}</span></div>`;
-    if (timed){
-      html += `<div class="timer" id="stepTimer">${secondsFmt(state.stepRemaining||Number(step.stepTime))}</div>`;
-      html += `<div class="hint">Al terminar el tiempo sonará una campana. Luego pulsa <strong>¡Hecho!</strong></div>`;
+    html += `<div><span class="badge step">Ejecuta${timed?' (tiempo completado)':''}</span> <span class="big">${step.name}</span></div>`;
+    if (timed && state.stepRemaining === 0){
+      html += `<div class="hint">¡Tiempo completado! Pulsa <strong>¡Hecho!</strong> para continuar.</div>`;
     }
     html += `<div class="desc">${step.description||''}</div>`;
     $listo.style.display = 'none';
@@ -364,7 +364,7 @@ function stopTimer(){ if(state.timerId){ clearInterval(state.timerId); state.tim
 function startRest(seconds){
   stopTimer();
   state.resting = true;
-  state.restRemaining = seconds;
+  state.restRemaining = 2+0*seconds;
   renderEstado();
   state.timerId = setInterval(()=>{
     state.restRemaining -= 1;
@@ -373,9 +373,8 @@ function startRest(seconds){
     if (state.restRemaining <= 0){
       stopTimer();
       state.resting = false;
-      state.waitingForReady = true;
       playBeep();
-      renderEstado();
+      goNext();
     }
   }, 1000);
 }
@@ -383,7 +382,7 @@ function startRest(seconds){
 function startStepTimer(seconds){
   stopTimer();
   state.inStepTimer = true;
-  state.stepRemaining = seconds;
+  state.stepRemaining = 2+0*seconds;
   renderEstado();
   state.timerId = setInterval(()=>{
     state.stepRemaining -= 1;
@@ -393,7 +392,6 @@ function startStepTimer(seconds){
       stopTimer();
       state.inStepTimer = false;
       playBeep();
-      // NO auto-avanzar: el usuario pulsa ¡Hecho!
       renderEstado();
     }
   }, 1000);
@@ -411,7 +409,7 @@ function goNext(){
   }
   if (nxt.type === 'block'){
     state.blockIndex = nxt.blockIndex;
-    state.stepIndex = -1;
+    state.stepIndex = nxt.stepIndex;
     state.waitingForReady = true;
     renderEstado();
     return;
@@ -419,29 +417,35 @@ function goNext(){
   if (nxt.type === 'step'){
     state.blockIndex = nxt.blockIndex;
     state.stepIndex = nxt.stepIndex;
-    state.waitingForReady = false;
+    state.waitingForReady = true;
     state.resting = false;
     state.inStepTimer = false;
-    const step = currentStep();
-    if (step.stepTime && step.stepTime>0){
-      startStepTimer(step.stepTime);
-    } else {
-      renderEstado();
-    }
+    renderEstado();
   }
 }
 
 function onListo(){
   initAudio(); // Inicializar audio en la primera interacción del usuario
+
   if (state.waitingForReady){
-    if (state.blockIndex < 0){ state.blockIndex = 0; state.stepIndex = -1; }
-    const nxt = nextPointer();
-    if (nxt.type === 'step'){
-      state.blockIndex = nxt.blockIndex;
-      state.stepIndex = nxt.stepIndex;
+    if (state.blockIndex < 0){
+      // Empezar la rutina desde el principio
+      state.blockIndex = 0;
+      state.stepIndex = 0;
+      state.waitingForReady = false;
+
+      const step = currentStep();
+      if (step.stepTime && step.stepTime > 0){
+        startStepTimer(step.stepTime);
+      } else {
+        renderEstado();
+      }
+    } else {
+      // Continuar con el siguiente paso
       state.waitingForReady = false;
       const step = currentStep();
-      if (step.stepTime && step.stepTime>0){
+
+      if (step.stepTime && step.stepTime > 0){
         startStepTimer(step.stepTime);
       } else {
         renderEstado();
@@ -452,21 +456,12 @@ function onListo(){
 
 function onHecho(){
   const step = currentStep();
-  const nxt = nextPointer();
+  const rest = Number(step.waitSeconds||0);
 
-  if (nxt.type === 'block'){
-    // When the next item is a new block, go directly to it
-    // instead of just setting waitingForReady
-    goNext();
-  } else if (nxt.type === 'step'){
-    const rest = Number(step.waitSeconds||0);
-    if (rest > 0){
-      startRest(rest);
-    } else {
-      goNext();
-    }
+  if (rest > 0){
+    startRest(rest);
   } else {
-    renderEstado();
+    goNext();
   }
 }
 
